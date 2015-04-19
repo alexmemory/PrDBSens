@@ -54,3 +54,7 @@ docs/_build/
 target/
 
 .ipynb_checkpoints
+*.py~
+
+logs
+.ruffus_history.sqlite
