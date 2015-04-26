@@ -112,9 +112,6 @@ def pow1st(in_path, out_path, lg, lm):
 def pow1st_qres(in_path, out_path, lg, lm):
     """Write transformed instances to a database and execute the query."""
 
-    lg.info("xform::pow1st_qres ::in_path %s"%in_path)
-    lg.info("xform::pow1st_qres ::out_path %s"%out_path)
-
     ins = pd.HDFStore(in_path,'r') 
     ous = pd.HDFStore(out_path,'w') 
     try:
@@ -213,5 +210,48 @@ def pow1st_qres(in_path, out_path, lg, lm):
         ins.close()
         ous.close()
 
+@rf.mkdir(pow1st_qres, rf.formatter(), "{path[0]}/cmp")
+@rf.transform(pow1st_qres, rf.formatter(),
+              "{path[0]}/cmp/{basename[0]}{ext[0]}", lg, lm)
+def pow1st_cmp(in_path, out_path, lg, lm):
+    """Compare query results of transformed db instances to non-transformed."""
+
+    ins = pd.HDFStore(in_path,'r') 
+    ous = pd.HDFStore(out_path,'w') 
+    try:
+        qcfg = ins.get_storer(ins.keys()[0]).attrs.info['qcfg']
+        lg.info("xform::pow1st_cmp ::qcfg %s"%qcfg)
+        
+        dfo = ins['orig']      # Query result of non-transformed instance
+        dfo = dfo.set_index('tuple').rename(columns={'conf':'orig'})
+        dfo['origRnk'] = dfo.rank(ascending=False) # Rank by desc. conf.
+
+        results = []
+        # Loop over transformed results
+        for xfnam,xfpath in [(grp._v_name,grp._v_pathname) for grp in ins.root.exp]:
+            lg.info("xform::pow1st_cmp path::%s ::starting"%xfpath)
+            dft = ins[xfpath]   # Query result of a transformed instance
+            info = ins.get_storer(xfpath).attrs.info
+
+            dft = dft.set_index('tuple').rename(columns={'conf':'xform'})
+            dft['xformRnk'] = dft.rank(ascending=False) # By desc conf
+
+            dfm = dfo.join(dft) # Merge in preparation for comparison
+            assert len(dfo) == len(dft) == len(dfm)
+            results.append({'numerator':info['numerator'],
+                            'denominator':info['denominator'],
+                            'pearson':dfm.corr(method='pearson').loc['orig']['xform'],
+                            'spearman':dfm.corr(method='spearman').loc['origRnk']['xformRnk'],
+                            'kendall':dfm.corr(method='kendall').loc['origRnk']['xformRnk']})
+            lg.info("xform::pow1st_cmp path::%s ::done"%xfpath)
+
+        newk = 'comparison'
+        ous[newk] = pd.DataFrame(results).set_index(['numerator','denominator'])
+        ous.get_storer(newk).attrs.info = ins.get_storer('orig').attrs.info
+
+    finally:
+        ins.close()
+        ous.close()
+        
 cmdline.run(options, checksum_level = rf.ruffus_utility.CHECKSUM_HISTORY_TIMESTAMPS, logger=lg)
 
