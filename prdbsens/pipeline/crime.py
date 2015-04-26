@@ -4,13 +4,10 @@ import glob
 import ruffus as rf
 import ruffus.cmdline as cmdline
 import pandas as pd
-# import datetime as dt
 import numpy as np
-# import math
-# from sklearn import preprocessing
-# import sklearn.metrics
 import os, errno
 import yaml
+from trio import triodb
 # import warnings
 # warnings.filterwarnings("ignore", message=".*deprecation.*")
 
@@ -26,6 +23,22 @@ if vars(options)['config'] == None:
 with open(vars(options)['config'], 'r') as f: cfg = yaml.load(f)
 lg.info('pipeline:: ::config %s'%str(cfg))
 
+# =============================================================
+#                    functions
+# =============================================================
+
+def execute_sql_commands(sql, cur):
+    """Execute multiple SQL commands in a string on a cursor."""
+    for line in sql.split(";"):
+        line = line.strip()
+        line = line.replace("\n"," ")
+        if line == "":
+            continue
+        # lg.info("sql:: ::line %s"%line)
+        cur.execute(line)
+        
+def q(sql):
+    return sql.replace("\n"," ").replace(";","")
 # =============================================================
 #                    pow, 1st
 # =============================================================
@@ -90,6 +103,114 @@ def pow1st(in_path, out_path, lg, lm):
                                                    'denominator':r['denominator']}
             
     finally:
+        ous.close()
+
+@rf.jobs_limit(1)               # For now, prevent parallel tasks using Trio
+@rf.mkdir(pow1st, rf.formatter(), "{path[0]}/qres")
+@rf.transform(pow1st, rf.formatter(),
+              "{path[0]}/qres/{basename[0]}{ext[0]}", lg, lm)
+def pow1st_qres(in_path, out_path, lg, lm):
+    """Write transformed instances to a database and execute the query."""
+
+    lg.info("xform::pow1st_qres ::in_path %s"%in_path)
+    lg.info("xform::pow1st_qres ::out_path %s"%out_path)
+
+    ins = pd.HDFStore(in_path,'r') 
+    ous = pd.HDFStore(out_path,'w') 
+    try:
+        qcfg = ins.get_storer(ins.keys()[0]).attrs.info['qcfg']
+        lg.info("xform::pow1st_qres ::qcfg %s"%qcfg)
+        
+        # Query the non-transformed instance
+        conn = triodb.connect(database=cfg['database']['name'], 
+                              user=cfg['database']['user'], 
+                              password=cfg['database']['password'])
+        cur = conn.cursor()
+        try:
+            for rel,k in [(grp._v_name,grp._v_pathname) for grp in ins.root.orig]:
+                lg.info("xform::pow1st_qres path::%s ::starting"%k)
+                t = ins[k]          # dataframe with relation
+                info = ins.get_storer(k).attrs.info
+
+                sqls = [info['create']] # SQL to create table
+                for r in t.itertuples(): # 1st col is index, last is confidence
+                    sqls.append(info['insert'] %r[1:]) # SQL to insert a row
+                sql = '\n'.join(sqls)
+                execute_sql_commands(sql, cur)
+                # lg.info("xform::pow1st_qres path::%s ::sql %s"%(k,sql))
+                lg.info("xform::pow1st_qres path::%s ::done"%k)
+
+            sql = qcfg['create'] # Create the table to query
+            lg.info("xform::pow1st_qres table:: ::sql %s"%sql)
+            cur.execute(q(sql))
+            for t in cur.xfetchall(): print t
+            
+            sql = qcfg['query'] # The query with the ranking we care about
+            lg.info("xform::pow1st_qres query:: ::sql %s"%sql)
+            cur.execute(q(sql))
+
+            rows = []           # Rows of the result of the query
+            for t in cur.xfetchall(): 
+                rows.append({'tuple':str(t).strip(),
+                             'conf':t.alternatives[0].computeConfidence(conn)})
+            df = pd.DataFrame(rows)
+            lg.info("xform::pow1st_qres query:: ::df %s"%('\n'+str(df)))
+
+            newk = 'orig'
+            ous[newk] = df                            # Store result in output df
+            ous.get_storer(newk).attrs['info'] = info # Arbitrarily copy an info
+
+        finally:
+            conn.close()
+
+        # Query the transformed instances
+        for xfnam,xfdir in [(grp._v_name,grp._v_pathname) for grp in ins.root.exp]:
+            lg.info("xform::pow1st_qres xfname::%s ::starting"%xfnam)
+
+            conn = triodb.connect(database=cfg['database']['name'], 
+                                  user=cfg['database']['user'], 
+                                  password=cfg['database']['password'])
+            cur = conn.cursor()
+            try:
+                for rel,k in [(grp._v_name,grp._v_pathname) for
+                              grp in ins.root.exp._f_get_child(xfnam)]:
+                    lg.info("xform::pow1st_qres path::%s ::starting"%k)
+                    t = ins[k]          # dataframe with relation
+                    info = ins.get_storer(k).attrs.info
+
+                    sqls = [info['create']] # SQL to create table
+                    for r in t.itertuples(): # 1st col is index, last is confidence
+                        sqls.append(info['insert'] %r[1:]) # SQL to insert a row
+                    sql = '\n'.join(sqls)
+                    execute_sql_commands(sql, cur)
+                    lg.info("xform::pow1st_qres path::%s ::done"%k)
+
+                sql = qcfg['create'] # Create the table to query
+                lg.info("xform::pow1st_qres table:: ::sql %s"%sql)
+                cur.execute(q(sql))
+                for t in cur.xfetchall(): print t
+
+                sql = qcfg['query'] # The query
+                lg.info("xform::pow1st_qres query:: ::sql %s"%sql)
+                cur.execute(q(sql))
+
+                rows = []
+                for t in cur.xfetchall(): 
+                    rows.append({'tuple':str(t).strip(),
+                                 'conf':t.alternatives[0].computeConfidence(conn)})
+                df = pd.DataFrame(rows)
+                lg.info("xform::pow1st_qres query:: ::df %s"%('\n'+str(df)))
+
+                newk = xfdir
+                ous[newk] = df
+                ous.get_storer(newk).attrs['info'] = info # Arbitrarily copy an info
+
+            finally:
+                conn.close()
+                
+            lg.info("xform::pow1st_qres xfname::%s ::done"%xfnam)
+    finally:
+        ins.close()
         ous.close()
 
 cmdline.run(options, checksum_level = rf.ruffus_utility.CHECKSUM_HISTORY_TIMESTAMPS, logger=lg)

@@ -19,7 +19,7 @@ transform:
 # A blank Trio DB on localhost
 # See scripts/setup_scratch_database.sh
 database:
-  name: scratch
+  name: trio1
   user: amemory
   password: password
 
