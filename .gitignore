@@ -60,3 +60,5 @@ logs
 .ruffus_history.sqlite
 \#*.py\#
 .\#*.py
+*.sh~
+*.yaml~

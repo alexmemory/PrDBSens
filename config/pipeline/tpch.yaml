@@ -1,0 +1,25 @@
+# Configuration for pipeline using TPCH
+
+# File path where pipelines are stored
+pipelines: /home/amemory/Data/prdbsens/pipelines/
+
+name: tpch                     # This pipeline
+
+relations: rel                  # CSV files for each CRIME relation
+
+# Kinds of transformations
+transform:
+  pow:                          # Tuple confidence
+    exponents: pow/exponents.csv
+    1st:                        # Transform the first relation
+      dir: pow/1st
+    all:                        # Transform all relations
+      dir: pow/all
+
+# A blank Trio DB on localhost
+# See scripts/setup_scratch_database.sh
+database:
+  name: trio1
+  user: amemory
+  password: password
+
