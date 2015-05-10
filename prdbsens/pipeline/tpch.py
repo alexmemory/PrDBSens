@@ -357,18 +357,18 @@ def powall_qres(in_path, out_path, lg, lm):
                 for r in t.itertuples(): # 1st col is index, last is confidence
                     sqls.append(info['insert'] %r[1:]) # SQL to insert a row
                 sql = '\n'.join(sqls)
+                lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql[:min(len(sql),1000)]))
                 execute_sql_commands(sql, cur)
-                # lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql))
                 lg.info("xform::powall_qres path::%s ::done"%k)
 
             sql = qcfg['create'] # Create the table to query
             lg.info("xform::powall_qres table:: ::sql %s"%sql)
             cur.execute(q(sql))
-            try:
-                for t in cur.xfetchall():
-                    print t  # Throws error with distinct, for some reason?
-            except Exception as e:
-                lg.warning(e)
+            # try:
+            #     for t in cur.xfetchall():
+            #         print t  # Throws error with distinct, for some reason?
+            # except Exception as e:
+            #     lg.warning(e)
             
             sql = qcfg['query'] # The query with the ranking we care about
             lg.info("xform::powall_qres query:: ::sql %s"%sql)
@@ -409,18 +409,18 @@ def powall_qres(in_path, out_path, lg, lm):
                     for r in t.itertuples(): # 1st col is index, last is confidence
                         sqls.append(info['insert'] %r[1:]) # SQL to insert a row
                     sql = '\n'.join(sqls)
+                    lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql[:min(len(sql),1000)]))
                     execute_sql_commands(sql, cur)
-                    # lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql))
                     lg.info("xform::powall_qres path::%s ::done"%k)
 
                 sql = qcfg['create'] # Create the table to query
                 lg.info("xform::powall_qres table:: ::sql %s"%sql)
                 cur.execute(q(sql))
-                try:
-                    for t in cur.xfetchall():
-                        print t  # Throws error with distinct, for some reason?
-                except Exception as e:
-                    lg.warning(e)
+                # try:
+                #     for t in cur.xfetchall():
+                #         print t  # Throws error with distinct, for some reason?
+                # except Exception as e:
+                #     lg.warning(e)
 
                 sql = qcfg['query'] # The query
                 lg.info("xform::powall_qres query:: ::sql %s"%sql)
