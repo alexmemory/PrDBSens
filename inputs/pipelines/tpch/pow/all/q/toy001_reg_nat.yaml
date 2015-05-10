@@ -1,0 +1,21 @@
+relations:
+  region_r:
+    create: |
+      create trio table region_r(regionkey int,
+      name varchar(25), comment varchar(152),
+      uncertain(name, comment))
+      with confidences;
+    insert: insert into region_r values [(%d,'%s','%s'):%f];
+  nation_n:
+    create: |
+      create trio table nation_n(nationkey int,
+      name varchar(25), regionkey int,
+      comment varchar(152),
+      uncertain(name, regionkey, comment)) with confidences;
+    insert: insert into nation_n values [(%d,'%s',%d,'%s'):%f];
+create: | 
+  create table reg_nat as
+  select distinct nation_n.name as nation, region_r.name as region
+  from nation_n, region_r
+  where nation_n.regionkey = region_r.regionkey;
+query: select * from reg_nat

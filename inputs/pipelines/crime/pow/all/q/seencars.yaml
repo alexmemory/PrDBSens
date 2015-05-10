@@ -1,0 +1,17 @@
+relations:
+  drives:
+    create: |
+      create trio table DRIVES(person varchar(32),
+      car varchar(32), uncertain(person, car))
+      with confidences;
+    insert: insert into DRIVES values [('%s','%s'):%f];
+  sawcar:
+    create: |
+      create trio table SAWCAR(witness varchar(32),
+      car varchar(32), uncertain(car)) with confidences;
+    insert: insert into SAWCAR values [('%s','%s'):%f];
+create: | 
+  create table seencars as
+  select drives.person as suspect, drives.car, witness from drives, sawcar
+  where drives.car = sawcar.car;
+query: select * from seencars
