@@ -25,6 +25,8 @@ if vars(options)['config'] == None:
 with open(vars(options)['config'], 'r') as f: cfg = yaml.load(f)
 lg.info('pipeline:: ::config %s'%str(cfg))
 
+SQL_PRINT_MAX=1000
+
 # =============================================================
 #                    functions
 # =============================================================
@@ -299,8 +301,13 @@ def powall(in_path, out_path, lg, lm):
         for rel,sql in qcfg['relations'].iteritems():
             lg.info("xform::powall ::relation %s"%rel)
             k = 'orig/'+rel # key for entry in store
-            ous[k] = pd.read_csv(os.path.join(pipeline_dir, cfg['relations'], rel+'.csv'),
+            t = pd.read_csv(os.path.join(pipeline_dir, cfg['relations'], rel+'.csv'),
                                  quotechar="'")
+            lg.info("xform::powall relation::%s ::dtypes %s"%(rel,t.dtypes))
+            # t = t.apply(lambda c: c.str.replace(';',' '), axis=1) # Avoid errors
+            # lg.info("xform::powall relation::%s ::cleaned"%(rel))
+            # lg.info("xform::powall relation::%s ::dtypes %s"%(rel,t.dtypes))
+            ous[k] = t
             ous.get_storer(k).attrs['info'] = {'create':sql['create'],
                                                'insert':sql['insert'],
                                                'qcfg':qcfg}
@@ -312,9 +319,13 @@ def powall(in_path, out_path, lg, lm):
             expk = 'exp/m%06d/'%(exp*1000)
 
             for rel,sql in qcfg['relations'].iteritems():
-                lg.info("xform::powall ::exponent %f ::relation %s"%(exp,rel))
+                lg.info("xform::powall exponent::%f ::relation %s"%(exp,rel))
                 df = pd.read_csv(os.path.join(pipeline_dir, cfg['relations'], rel+'.csv'),
                                  quotechar="'")
+                lg.info("exponent::%f relation::%s ::dtypes %s"%(exp,rel,df.dtypes))
+                # df = df.apply(lambda c: c.str.replace(';',' '), axis=1) # Avoid errors
+                # lg.info("exponent::%f relation::%s ::cleaned"%(exp,rel))
+                # lg.info("exponent::%f relation::%s ::dtypes %s"%(exp,rel,df.dtypes))
                 df['conf'] = df.conf ** exp
                 k = expk+rel
                 ous[k] = df
@@ -327,7 +338,7 @@ def powall(in_path, out_path, lg, lm):
     finally:
         ous.close()
 
-# @rf.jobs_limit(1)               # For now, prevent parallel tasks using Trio
+@rf.jobs_limit(1)               # For now, prevent parallel tasks using Trio
 @rf.mkdir(powall, rf.formatter(), "{path[0]}/qres")
 @rf.transform(powall, rf.formatter(),
               "{path[0]}/qres/{basename[0]}{ext[0]}", lg, lm)
@@ -357,7 +368,7 @@ def powall_qres(in_path, out_path, lg, lm):
                 for r in t.itertuples(): # 1st col is index, last is confidence
                     sqls.append(info['insert'] %r[1:]) # SQL to insert a row
                 sql = '\n'.join(sqls)
-                lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql[:min(len(sql),1000)]))
+                lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql[-min(len(sql),SQL_PRINT_MAX):]))
                 execute_sql_commands(sql, cur)
                 lg.info("xform::powall_qres path::%s ::done"%k)
 
@@ -409,7 +420,7 @@ def powall_qres(in_path, out_path, lg, lm):
                     for r in t.itertuples(): # 1st col is index, last is confidence
                         sqls.append(info['insert'] %r[1:]) # SQL to insert a row
                     sql = '\n'.join(sqls)
-                    lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql[:min(len(sql),1000)]))
+                    lg.info("xform::powall_qres path::%s ::sql %s"%(k,sql[-min(len(sql),SQL_PRINT_MAX):]))
                     execute_sql_commands(sql, cur)
                     lg.info("xform::powall_qres path::%s ::done"%k)
 
@@ -459,6 +470,7 @@ def powall_cmp(in_path, out_path, lg, lm):
         lg.info("xform::powall_cmp ::qcfg %s"%qcfg)
         
         dfo = ins['orig']      # Query result of non-transformed instance
+        assert len(dfo) > 1
         dfo = dfo.set_index('tuple').rename(columns={'conf':'orig'})
         dfo['origRnk'] = dfo.rank(ascending=False) # Rank by desc. conf.
 
@@ -467,6 +479,7 @@ def powall_cmp(in_path, out_path, lg, lm):
         for xfnam,xfpath in [(grp._v_name,grp._v_pathname) for grp in ins.root.exp]:
             lg.info("xform::powall_cmp path::%s ::starting"%xfpath)
             dft = ins[xfpath]   # Query result of a transformed instance
+            assert len(dft) > 1
             info = ins.get_storer(xfpath).attrs.info
 
             dft = dft.set_index('tuple').rename(columns={'conf':'xform'})

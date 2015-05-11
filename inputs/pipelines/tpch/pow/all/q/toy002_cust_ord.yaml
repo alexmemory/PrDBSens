@@ -1,10 +1,31 @@
 relations:
+  # cust_c:
+  #   create: |
+  #     create trio table cust_c(
+  #     custkey int,
+  #     name varchar(25),
+  #     acctbal float,
+  #     address varchar(40),
+  #     mktsegment varchar(10),
+  #     nationkey int,
+  #     phone varchar(15),
+  #     comment varchar(117),
+  #     uncertain(
+  #     name,
+  #     acctbal,
+  #     address,
+  #     mktsegment,
+  #     nationkey,
+  #     phone,
+  #     comment))
+  #     with confidences;
+  #   insert: insert into cust_c values [(%d,'%s',%f,'%s','%s',%d,'%s','%s'):%f];
   cust_c:
     create: |
       create trio table cust_c(
       custkey int,
       name varchar(25),
-      acctbal float,
+      acctbal varchar(40),
       address varchar(40),
       mktsegment varchar(10),
       nationkey int,
@@ -19,7 +40,7 @@ relations:
       phone,
       comment))
       with confidences;
-    insert: insert into cust_c values [(%d,'%s',%f,'%s','%s',%d,'%s','%s'):%f];
+    insert: insert into cust_c values [(%d,'%s','%s','%s','%s',%d,'%s','%s'):%f];
   orders_o:
     create: |
       create trio table orders_o(
@@ -46,7 +67,7 @@ relations:
     insert: insert into orders_o values [(%d,%d,'%s',%f,'%s','%s',%d,'%s','%s'):%f];
 create: | 
   create table cust_ord as
-  select
+  select distinct
   orders_o.orderkey as orderkey,
   orders_o.orderdate as orderdate,
   orders_o.shippriority as shippriority,
