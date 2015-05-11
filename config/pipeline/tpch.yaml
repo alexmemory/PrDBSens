@@ -5,7 +5,15 @@ pipelines: /home/amemory/Data/prdbsens/pipelines/
 
 name: tpch                     # This pipeline
 
-relations: rel                  # CSV files for each CRIME relation
+# CSV files for each CRIME relation
+relations_orig: rel                 
+# relations: rel                 
+# relations: rel/sam/50000
+relations: rel/sam/20000
+
+relation_sampling:              # Relations larger than this will be sampled
+  # max_rows: 50000
+  max_rows: 20000               # Full region, nation and supplier
 
 # Kinds of transformations
 transform:

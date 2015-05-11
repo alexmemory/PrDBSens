@@ -51,6 +51,33 @@ def q(sql):
 pipeline_dir = os.path.join(cfg['pipelines'],cfg['name'])
 
 # =============================================================
+#                    sampling
+# =============================================================
+
+rel_orig_dir = os.path.join(pipeline_dir, cfg['relations_orig'])
+
+# Input query file paths
+path_glob = os.path.join(rel_orig_dir, '*.csv')
+rel_orig_paths = glob.glob(path_glob)
+max_rows = cfg['relation_sampling']['max_rows']
+
+@rf.mkdir(rel_orig_paths, rf.formatter(), "{path[0]}/sam/%d"%max_rows)
+@rf.transform(rel_orig_paths, rf.formatter(),
+              "{path[0]}/sam/%d/{basename[0]}{ext[0]}"%max_rows, lg, lm,"{basename[0]}")
+def rel_sam(in_path, out_path, lg, lm, fname):
+    """Sample relation files if necessary."""
+
+    lg.info("rel_orig::%s sampling:: ::starting"%fname)
+    lg.info("rel_orig::%s sampling:: ::in_path %s"%(fname,in_path))
+    df = pd.read_csv(in_path, quotechar="'")
+
+    if len(df) > max_rows:
+        df = df.ix[np.random.choice(df.index, max_rows, replace=False)]
+    
+    df.to_csv(out_path, index=False, quotechar="'")
+    lg.info("rel_orig::%s sampling:: ::done"%fname)
+
+# =============================================================
 #                    pow, 1st
 # =============================================================
 
@@ -64,6 +91,7 @@ q_paths = glob.glob(path_glob)
 exp_path = os.path.join(pipeline_dir, cfg['transform']['pow']['exponents'])
 in_paths = [[q_path, exp_path] for q_path in q_paths]
 
+@rf.follows(rel_sam)
 @rf.mkdir(in_paths, rf.formatter(), "{path[0]}/{basename[0]}")
 @rf.transform(in_paths, rf.formatter(),
               "{path[0]}/{basename[0]}/{basename[0]}.h5", lg, lm)
@@ -264,7 +292,7 @@ def pow1st_cmp(in_path, out_path, lg, lm):
     finally:
         ins.close()
         ous.close()
-        
+
 # =============================================================
 #                    pow, all
 # =============================================================
@@ -279,6 +307,7 @@ q_paths = glob.glob(path_glob)
 exp_path = os.path.join(pipeline_dir, cfg['transform']['pow']['exponents'])
 in_paths = [[q_path, exp_path] for q_path in q_paths]
 
+@rf.follows(rel_sam)
 @rf.mkdir(in_paths, rf.formatter(), "{path[0]}/{basename[0]}")
 @rf.transform(in_paths, rf.formatter(),
               "{path[0]}/{basename[0]}/{basename[0]}.h5", lg, lm)
