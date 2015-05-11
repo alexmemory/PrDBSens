@@ -1,0 +1,74 @@
+relations:
+  cust_c:
+    create: |
+      create trio table cust_c(
+      custkey int,
+      name varchar(25),
+      acctbal varchar(40),
+      address varchar(40),
+      mktsegment varchar(10),
+      nationkey int,
+      phone varchar(15),
+      comment varchar(117),
+      uncertain(
+      name,
+      acctbal,
+      address,
+      mktsegment,
+      nationkey,
+      phone,
+      comment))
+      with confidences;
+    insert: insert into cust_c values [(%d,'%s','%s','%s','%s',%d,'%s','%s'):%f];
+  orders_o:
+    create: |
+      create trio table orders_o(
+      orderkey int,
+      custkey int,
+      orderstatus varchar(1),
+      totalprice float,
+      orderdate varchar(40),
+      orderpriority varchar(15),
+      shippriority int,
+      clerk varchar(15),
+      comment varchar(79),
+      uncertain(
+      custkey,
+      orderstatus,
+      totalprice,
+      orderdate,
+      orderpriority,
+      shippriority,
+      clerk,
+      comment
+      ))
+      with confidences;
+    insert: insert into orders_o values [(%d,%d,'%s',%f,'%s','%s',%d,'%s','%s'):%f];
+  region_r:
+    create: |
+      create trio table region_r(regionkey int,
+      name varchar(25), comment varchar(152),
+      uncertain(name, comment))
+      with confidences;
+    insert: insert into region_r values [(%d,'%s','%s'):%f];
+  nation_n:
+    create: |
+      create trio table nation_n(nationkey int,
+      name varchar(25), regionkey int,
+      comment varchar(152),
+      uncertain(name, regionkey, comment)) with confidences;
+    insert: insert into nation_n values [(%d,'%s',%d,'%s'):%f];
+create: | 
+  create table toy003 as
+  select distinct
+  cust_c.name as customer,
+  orders_o.orderkey as orderkey,
+  nation_n.name as nation,
+  region_r.name as region
+  from orders_o, cust_c, region_r, nation_n
+  where region_r.name = 'ASIA'
+  and orders_o.custkey = cust_c.custkey
+  and cust_c.nationkey = nation_n.nationkey
+  and nation_n.regionkey = region_r.regionkey
+  and orders_o.orderdate >= '1994-01-01';
+query: select * from toy003
