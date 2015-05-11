@@ -180,7 +180,7 @@ def pow1st_qres(in_path, out_path, lg, lm):
             sql = qcfg['create'] # Create the table to query
             lg.info("xform::pow1st_qres table:: ::sql %s"%sql)
             cur.execute(q(sql))
-            for t in cur.xfetchall(): print t
+            # for t in cur.xfetchall(): print t
             
             sql = qcfg['query'] # The query with the ranking we care about
             lg.info("xform::pow1st_qres query:: ::sql %s"%sql)
@@ -191,7 +191,7 @@ def pow1st_qres(in_path, out_path, lg, lm):
                 rows.append({'tuple':str(t).strip(),
                              'conf':t.alternatives[0].computeConfidence(conn)})
             df = pd.DataFrame(rows)
-            lg.info("xform::pow1st_qres query:: ::df %s"%('\n'+str(df)))
+            lg.info("xform::pow1st_qres query:: ::df %s"%('\n'+str(df.head(2))))
 
             newk = 'orig'
             ous[newk] = df                            # Store result in output df
@@ -225,7 +225,7 @@ def pow1st_qres(in_path, out_path, lg, lm):
                 sql = qcfg['create'] # Create the table to query
                 lg.info("xform::pow1st_qres table:: ::sql %s"%sql)
                 cur.execute(q(sql))
-                for t in cur.xfetchall(): print t
+                # for t in cur.xfetchall(): print t
 
                 sql = qcfg['query'] # The query
                 lg.info("xform::pow1st_qres query:: ::sql %s"%sql)
@@ -236,7 +236,7 @@ def pow1st_qres(in_path, out_path, lg, lm):
                     rows.append({'tuple':str(t).strip(),
                                  'conf':t.alternatives[0].computeConfidence(conn)})
                 df = pd.DataFrame(rows)
-                lg.info("xform::pow1st_qres query:: ::df %s"%('\n'+str(df)))
+                lg.info("xform::pow1st_qres query:: ::df %s"%('\n'+str(df.head(2))))
 
                 newk = xfdir
                 ous[newk] = df
@@ -263,6 +263,7 @@ def pow1st_cmp(in_path, out_path, lg, lm):
         lg.info("xform::pow1st_cmp ::qcfg %s"%qcfg)
         
         dfo = ins['orig']      # Query result of non-transformed instance
+        assert len(dfo) > 1
         dfo = dfo.set_index('tuple').rename(columns={'conf':'orig'})
         dfo['origRnk'] = dfo.rank(ascending=False) # Rank by desc. conf.
 
@@ -271,6 +272,7 @@ def pow1st_cmp(in_path, out_path, lg, lm):
         for xfnam,xfpath in [(grp._v_name,grp._v_pathname) for grp in ins.root.exp]:
             lg.info("xform::pow1st_cmp path::%s ::starting"%xfpath)
             dft = ins[xfpath]   # Query result of a transformed instance
+            assert len(dft) > 1
             info = ins.get_storer(xfpath).attrs.info
 
             dft = dft.set_index('tuple').rename(columns={'conf':'xform'})
